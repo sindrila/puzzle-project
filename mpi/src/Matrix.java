@@ -14,8 +14,6 @@ public final class Matrix implements Serializable {
     private final int freePosJ;
 
     private final Matrix previousState;
-    private final int minSteps;
-    private final int estimation;
     private final int manhattan;
     private final String move;
     private final int hashValue;
@@ -29,8 +27,6 @@ public final class Matrix implements Serializable {
         this.previousState = previousState;
         this.move = move;
         this.manhattan = manhattanDistance();
-        this.minSteps = numOfSteps + manhattan;
-        this.estimation = manhattan + numOfSteps;
         this.hashValue = hashCodeFake();
     }
 
@@ -124,21 +120,12 @@ public final class Matrix implements Serializable {
         return hashValue;
     }
 
-
     private int hashCodeFake() {
         int result = 0;
         for (int i = 0; i < 4; i++) {
             result += Arrays.hashCode(tiles[i]);
         }
         return result;
-    }
-
-    public int getEstimation() {
-        return estimation;
-    }
-
-    public int getMinSteps() {
-        return minSteps;
     }
 
     public int getNumOfSteps() {

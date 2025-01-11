@@ -21,70 +21,64 @@ public class Main {
     }
 
     private static void searchMaster(Matrix root) {
-        int size = MPI.COMM_WORLD.Size();
-        int workers = size - 1;
-        int minBound = root.getManhattan();
+        int numberOfWorkersPlusMaster = MPI.COMM_WORLD.Size();
+        int numberOfWorkers = numberOfWorkersPlusMaster - 1;
+        int originalMatrixBound = root.getManhattan();
         boolean found = false;
         long time = System.currentTimeMillis();
 
-        // generate the starting configurations for the workers
-        Queue<Matrix> q = new LinkedList<>();
-        q.add(root);
-        while (q.size() + q.peek().generateMoves().size() - 1 <= workers) {
-            Matrix curr = q.poll();
+        Queue<Matrix> matrixMoveQueue = new LinkedList<>();
+        matrixMoveQueue.add(root);
+        // generate as many possible moves as the number of workers
+        while (matrixMoveQueue.size() + matrixMoveQueue.peek().generateMoves().size() - 1 <= numberOfWorkers) {
+            Matrix curr = matrixMoveQueue.poll();
             for (Matrix neighbour : curr.generateMoves()) {
-                q.add(neighbour);
+                matrixMoveQueue.add(neighbour);
             }
         }
 
         while (!found) {
-
-            // send data to all workers
-            Queue<Matrix> temp = new LinkedList<>();
-            temp.addAll(q);
-            for (int i = 0; i < q.size(); i++) {
-                // for each worker, send a "root"
-                Matrix curr = temp.poll();
+            Queue<Matrix> currentMatricesQueue = new LinkedList<>(matrixMoveQueue);
+            for (int i = 0; i < matrixMoveQueue.size(); i++) {
+                Matrix currentMatrix = currentMatricesQueue.poll();
                 MPI.COMM_WORLD.Send(new boolean[]{false}, 0, 1, MPI.BOOLEAN, i + 1, 0);
-                MPI.COMM_WORLD.Send(new Object[]{curr}, 0, 1, MPI.OBJECT, i + 1, 0);
-                MPI.COMM_WORLD.Send(new int[]{minBound}, 0, 1, MPI.INT, i + 1, 0);
+                MPI.COMM_WORLD.Send(new Object[]{currentMatrix}, 0, 1, MPI.OBJECT, i + 1, 0);
+                MPI.COMM_WORLD.Send(new int[]{originalMatrixBound}, 0, 1, MPI.INT, i + 1, 0);
             }
 
-            Object[] pairs = new Object[size + 5];
-            // receive data
-            for (int i = 1; i <= q.size(); i++) {
-                MPI.COMM_WORLD.Recv(pairs, i - 1, 1, MPI.OBJECT, i, 0);
+            Object[] workerResultingPairs = new Object[numberOfWorkersPlusMaster + 5];
+            for (int i = 1; i <= matrixMoveQueue.size(); i++) {
+                MPI.COMM_WORLD.Recv(workerResultingPairs, i - 1, 1, MPI.OBJECT, i, 0);
             }
 
             // check if any node found a solution
             int newMinBound = Integer.MAX_VALUE;
-            for (int i = 0; i < q.size(); i++) {
-                Pair<Integer, Matrix> p = (Pair<Integer, Matrix>) pairs[i];
-                //System.out.println(p.toString());
-                if (p.getFirst() == -1) {
+            for (int i = 0; i < matrixMoveQueue.size(); i++) {
+                Pair<Integer, Matrix> workerSolutionPair = (Pair<Integer, Matrix>) workerResultingPairs[i];
+                if (workerSolutionPair.getFirst() == -1) {
                     // found solution
-                    System.out.println("Solution found in " + p.getSecond().getNumOfSteps() + " steps");
+                    System.out.println("Solution found in " + workerSolutionPair.getSecond().getNumOfSteps() + " steps");
                     System.out.println("Solution is: ");
-                    System.out.println(p.getSecond());
+                    System.out.println(workerSolutionPair.getSecond());
                     System.out.println("Execution time: " + (System.currentTimeMillis() - time) + "ms");
                     found = true;
                     break;
-                } else if (p.getFirst() < newMinBound) {
-                    newMinBound = p.getFirst();
+                } else if (workerSolutionPair.getFirst() < newMinBound) {
+                    newMinBound = workerSolutionPair.getFirst();
                 }
             }
             if(!found){
                 System.out.println("Depth " + newMinBound + " reached in " + (System.currentTimeMillis() - time) + "ms");
-                minBound = newMinBound;
+                originalMatrixBound = newMinBound;
             }
         }
 
-        for (int i = 1; i < size; i++) {
+        for (int i = 1; i < numberOfWorkersPlusMaster; i++) {
             // shut down workers when solution was found
-            Matrix curr = q.poll();
+            Matrix curr = matrixMoveQueue.poll();
             MPI.COMM_WORLD.Send(new boolean[]{true}, 0, 1, MPI.BOOLEAN, i, 0);
             MPI.COMM_WORLD.Send(new Object[]{curr}, 0, 1, MPI.OBJECT, i, 0);
-            MPI.COMM_WORLD.Send(new int[]{minBound}, 0, 1, MPI.INT, i, 0);
+            MPI.COMM_WORLD.Send(new int[]{originalMatrixBound}, 0, 1, MPI.INT, i, 0);
         }
     }
 
@@ -97,12 +91,11 @@ public class Main {
             MPI.COMM_WORLD.Recv(matrix, 0, 1, MPI.OBJECT, 0, 0);
             MPI.COMM_WORLD.Recv(bound, 0, 1, MPI.INT, 0, 0);
             if (end[0]) { // shut down when solution was found
-                //System.out.println("Node " + MPI.COMM_WORLD.Rank() + " is ending its execution");
                 return;
             }
-            int minBound = bound[0];
+            int originalMatrixBound = bound[0];
             Matrix current = (Matrix) matrix[0];
-            Pair<Integer, Matrix> result = search(current, current.getNumOfSteps(), minBound);
+            Pair<Integer, Matrix> result = search(current, current.getNumOfSteps(), originalMatrixBound);
             MPI.COMM_WORLD.Send(new Object[]{result}, 0, 1, MPI.OBJECT, 0, 0);
         }
     }

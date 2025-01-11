@@ -30,7 +30,7 @@ public final class Matrix {
     public static Matrix fromFile() throws IOException {
         byte[][] tiles = new byte[4][4];
         int freeI = -1, freeJ = -1;
-        Scanner scanner = new Scanner(new BufferedReader(new FileReader(new File("matrix.in"))));
+        Scanner scanner = new Scanner(new BufferedReader(new FileReader("matrix.in")));
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
                 tiles[i][j] = Integer.valueOf(scanner.nextInt()).byteValue();
@@ -48,21 +48,26 @@ public final class Matrix {
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
                 if (tiles[i][j] != 0) {
+                    // calculate the indexes of the correct tile for a number
                     int targetI = (tiles[i][j] - 1) / 4;
                     int targetJ = (tiles[i][j] - 1) % 4;
                     s += Math.abs(i - targetI) + Math.abs(j - targetJ);
                 }
             }
         }
+        // sum is heuristic in algorithm to determine how far apart the current state is form the puzzle solution
         return s;
     }
 
     public List<Matrix> generateMoves() {
         List<Matrix> moves = new ArrayList<>();
         for (int k = 0; k < 4; k++) {
+            // move the free position
+            // check if move is not outside the matrix
             if (freePosI + dx[k] >= 0 && freePosI + dx[k] < 4 && freePosJ + dy[k] >= 0 && freePosJ + dy[k] < 4) {
                 int movedFreePosI = freePosI + dx[k];
                 int movedFreePosJ = freePosJ + dy[k];
+                // check if new position is different from the last state
                 if (previousState != null && movedFreePosI == previousState.freePosI && movedFreePosJ == previousState.freePosJ) {
                     continue;
                 }
